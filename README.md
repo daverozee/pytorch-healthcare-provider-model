@@ -29,12 +29,19 @@ Replace the CSV path with the location where you downloaded the CMS file:
 python train_provider_payment_model.py --csv "C:\Users\admin\Downloads\MUP_PHY_R26_P05_V10_D24_Prov.csv"
 ```
 
+For a more talkative local run, add tracing and library verbosity:
+
+```powershell
+python train_provider_payment_model.py --csv "C:\Users\admin\Downloads\MUP_PHY_R26_P05_V10_D24_Prov.csv" --trace --log-level DEBUG --library-verbose
+```
+
 The script creates an `artifacts` folder containing:
 
 - `provider_payment_model.pt` - trained PyTorch model weights
 - `preprocessor.joblib` - scikit-learn preprocessing pipeline
 - `metrics.json` - validation/test metrics
 - `feature_columns.json` - selected input and target columns
+- `training_trace.log` - local training trace with arguments, row counts, shapes, timings, and detailed debug output
 
 ## 3. What The Metrics Mean
 
@@ -42,7 +49,13 @@ The script creates an `artifacts` folder containing:
 - `rmse` is root mean squared error in dollars.
 - `r2_log` is R-squared on the log payment target. For this skewed healthcare payment data, the log metric is usually more meaningful than raw-dollar R-squared.
 
-## 4. Next Project Step
+## 4. Tracing Options
+
+- `--trace` logs start/end timings around major pipeline stages.
+- `--log-level DEBUG` prints and saves extra detail such as selected columns and model architecture.
+- `--library-verbose` passes verbosity into supported scikit-learn pipeline objects.
+- `--torch-detect-anomaly` enables PyTorch autograd anomaly detection when debugging gradient issues. It is useful, but slower.
+
+## 5. Next Project Step
 
 After this single-year model works, download 2021-2024 provider CSVs. Then we can train a forecasting model: use 2021-2023 provider features to predict 2024 payment growth.
-
