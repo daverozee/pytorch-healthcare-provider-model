@@ -326,6 +326,19 @@ def root_mean_squared_error(actual: np.ndarray, predicted: np.ndarray) -> float:
     return math.sqrt(mean_squared_error(actual, predicted))
 
 
+def quantile_summary(values: np.ndarray) -> dict[str, float]:
+    quantiles = np.quantile(values, [0, 0.01, 0.05, 0.5, 0.95, 0.99, 1.0])
+    return {
+        "min": float(quantiles[0]),
+        "p01": float(quantiles[1]),
+        "p05": float(quantiles[2]),
+        "median": float(quantiles[3]),
+        "p95": float(quantiles[4]),
+        "p99": float(quantiles[5]),
+        "max": float(quantiles[6]),
+    }
+
+
 def main():
     args = parse_args()
     output_dir = Path(args.output_dir)
@@ -420,13 +433,35 @@ def main():
         actual_log = y_test.to_numpy()
         pred_dollars = np.expm1(pred_log)
         actual_dollars = np.expm1(actual_log)
+        clipped_pred_log = np.clip(pred_log, actual_log.min(), actual_log.max())
+        clipped_pred_dollars = np.expm1(clipped_pred_log)
+
+    absolute_errors = np.abs(actual_dollars - pred_dollars)
+    clipped_absolute_errors = np.abs(actual_dollars - clipped_pred_dollars)
 
     metrics = {
         "rows": int(len(X)),
         "encoded_features": int(X_train_np.shape[1]),
+        "mae_log": float(mean_absolute_error(actual_log, pred_log)),
+        "rmse_log": float(root_mean_squared_error(actual_log, pred_log)),
+        "r2_log": float(r2_score(actual_log, pred_log)),
         "mae": float(mean_absolute_error(actual_dollars, pred_dollars)),
         "rmse": float(root_mean_squared_error(actual_dollars, pred_dollars)),
-        "r2_log": float(r2_score(actual_log, pred_log)),
+        "median_absolute_error": float(np.median(absolute_errors)),
+        "clipped_mae": float(mean_absolute_error(actual_dollars, clipped_pred_dollars)),
+        "clipped_rmse": float(root_mean_squared_error(actual_dollars, clipped_pred_dollars)),
+        "clipped_median_absolute_error": float(np.median(clipped_absolute_errors)),
+        "actual_log_quantiles": quantile_summary(actual_log),
+        "predicted_log_quantiles": quantile_summary(pred_log),
+        "actual_dollar_quantiles": quantile_summary(actual_dollars),
+        "predicted_dollar_quantiles": quantile_summary(pred_dollars),
+        "absolute_error_quantiles": quantile_summary(absolute_errors),
+        "extreme_prediction_counts": {
+            "pred_log_below_actual_min": int(np.sum(pred_log < actual_log.min())),
+            "pred_log_above_actual_max": int(np.sum(pred_log > actual_log.max())),
+            "pred_dollars_above_1b": int(np.sum(pred_dollars > 1_000_000_000)),
+            "pred_dollars_above_10b": int(np.sum(pred_dollars > 10_000_000_000)),
+        },
     }
 
     LOGGER.info("Metrics:\n%s", json.dumps(metrics, indent=2))

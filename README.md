@@ -49,7 +49,11 @@ The script creates an `artifacts` folder containing:
 
 - `mae` is mean absolute error in dollars after converting predictions back from log scale.
 - `rmse` is root mean squared error in dollars.
+- `median_absolute_error` is often easier to interpret than `mae` for this dataset because a few very large providers can dominate averages.
+- `mae_log` and `rmse_log` measure error on the log payment target used during training.
 - `r2_log` is R-squared on the log payment target. For this skewed healthcare payment data, the log metric is usually more meaningful than raw-dollar R-squared.
+- `clipped_mae` and `clipped_rmse` show dollar errors after clipping predicted log payments to the actual target range. Use these as diagnostics when a few extreme predictions make raw dollar metrics explode.
+- The quantile sections show whether predictions look reasonable across the distribution or whether only a few extreme values are distorting the dollar metrics.
 
 ## 4. Tracing Options
 
