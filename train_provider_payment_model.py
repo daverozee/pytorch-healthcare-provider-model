@@ -322,6 +322,10 @@ def predict(model, X: np.ndarray, device) -> np.ndarray:
     return np.concatenate(preds)
 
 
+def root_mean_squared_error(actual: np.ndarray, predicted: np.ndarray) -> float:
+    return math.sqrt(mean_squared_error(actual, predicted))
+
+
 def main():
     args = parse_args()
     output_dir = Path(args.output_dir)
@@ -421,7 +425,7 @@ def main():
         "rows": int(len(X)),
         "encoded_features": int(X_train_np.shape[1]),
         "mae": float(mean_absolute_error(actual_dollars, pred_dollars)),
-        "rmse": float(mean_squared_error(actual_dollars, pred_dollars, squared=False)),
+        "rmse": float(root_mean_squared_error(actual_dollars, pred_dollars)),
         "r2_log": float(r2_score(actual_log, pred_log)),
     }
 
