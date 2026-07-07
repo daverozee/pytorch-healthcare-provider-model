@@ -32,8 +32,10 @@ python train_provider_payment_model.py --csv "C:\Users\admin\Downloads\MUP_PHY_R
 For a more talkative local run, add tracing and library verbosity:
 
 ```powershell
-python train_provider_payment_model.py --csv "C:\Users\admin\Downloads\MUP_PHY_R26_P05_V10_D24_Prov.csv" --trace --log-level DEBUG --library-verbose
+python train_provider_payment_model.py --csv "C:\Users\admin\Downloads\MUP_PHY_R26_P05_V10_D24_Prov.csv" --trace --library-verbose
 ```
+
+When `--trace` is enabled, the script automatically uses DEBUG logging unless you pass a different `--log-level`.
 
 The script creates an `artifacts` folder containing:
 
@@ -51,9 +53,10 @@ The script creates an `artifacts` folder containing:
 
 ## 4. Tracing Options
 
-- `--trace` logs start/end timings around major pipeline stages.
-- `--log-level DEBUG` prints and saves extra detail such as selected columns and model architecture.
+- `--trace` logs visible start/end timings around major pipeline stages and training batch progress.
+- `--log-level DEBUG` prints and saves extra detail such as selected columns and model architecture. This is the default when `--trace` is used.
 - `--library-verbose` passes verbosity into supported scikit-learn pipeline objects.
+- `--trace-every-n-batches 10` changes how often training batch progress is logged. With `--trace`, the default is every 25 batches.
 - `--torch-detect-anomaly` enables PyTorch autograd anomaly detection when debugging gradient issues. It is useful, but slower.
 
 ## 5. Next Project Step

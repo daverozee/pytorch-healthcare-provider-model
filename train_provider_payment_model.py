@@ -74,9 +74,9 @@ def parse_args():
     )
     parser.add_argument(
         "--log-level",
-        default="INFO",
+        default=None,
         choices=["DEBUG", "INFO", "WARNING", "ERROR"],
-        help="Console and trace log verbosity.",
+        help="Console and trace log verbosity. Defaults to DEBUG when --trace is used, otherwise INFO.",
     )
     parser.add_argument(
         "--library-verbose",
@@ -87,6 +87,12 @@ def parse_args():
         "--torch-detect-anomaly",
         action="store_true",
         help="Enable PyTorch autograd anomaly detection for debugging training issues.",
+    )
+    parser.add_argument(
+        "--trace-every-n-batches",
+        type=int,
+        default=0,
+        help="When tracing, log training batch progress every N batches. Use 0 to disable batch progress.",
     )
     return parser.parse_args()
 
@@ -116,12 +122,13 @@ def configure_logging(output_dir: Path, log_level: str) -> Path:
 def trace_step(name: str, enabled: bool):
     start = time.perf_counter()
     if enabled:
-        LOGGER.debug("START %s", name)
+        LOGGER.info("TRACE START %s", name)
     try:
         yield
     finally:
         elapsed = time.perf_counter() - start
-        LOGGER.info("DONE %s in %.2fs", name, elapsed)
+        if enabled:
+            LOGGER.info("TRACE DONE %s in %.2fs", name, elapsed)
 
 
 def load_data(csv_path: str, sample_rows: int) -> pd.DataFrame:
@@ -236,7 +243,15 @@ def to_tensor_dataset(X: np.ndarray, y: pd.Series) -> TensorDataset:
     return TensorDataset(features, target)
 
 
-def train_model(model, train_loader, val_loader, epochs, learning_rate, device):
+def train_model(
+    model,
+    train_loader,
+    val_loader,
+    epochs,
+    learning_rate,
+    device,
+    trace_every_n_batches,
+):
     optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=1e-4)
     loss_fn = nn.SmoothL1Loss()
     best_val = math.inf
@@ -248,7 +263,7 @@ def train_model(model, train_loader, val_loader, epochs, learning_rate, device):
         epoch_start = time.perf_counter()
         model.train()
         train_losses = []
-        for xb, yb in train_loader:
+        for batch_index, (xb, yb) in enumerate(train_loader, start=1):
             xb = xb.to(device)
             yb = yb.to(device)
             optimizer.zero_grad()
@@ -257,6 +272,14 @@ def train_model(model, train_loader, val_loader, epochs, learning_rate, device):
             loss.backward()
             optimizer.step()
             train_losses.append(loss.item())
+            if trace_every_n_batches and batch_index % trace_every_n_batches == 0:
+                LOGGER.info(
+                    "TRACE epoch=%02d batch=%04d/%04d batch_loss=%.4f",
+                    epoch,
+                    batch_index,
+                    len(train_loader),
+                    loss.item(),
+                )
 
         model.eval()
         val_losses = []
@@ -303,10 +326,21 @@ def main():
     args = parse_args()
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    log_path = configure_logging(output_dir, args.log_level)
+    log_level = args.log_level or ("DEBUG" if args.trace else "INFO")
+    log_path = configure_logging(output_dir, log_level)
 
+    if args.trace and args.trace_every_n_batches == 0:
+        args.trace_every_n_batches = 25
+
+    LOGGER.info("=" * 72)
+    LOGGER.info("CMS provider payment model run started")
+    if args.trace:
+        LOGGER.info("TRACE ENABLED: detailed local tracing is active")
+    else:
+        LOGGER.info("TRACE DISABLED: add --trace for stage timings and batch progress")
     LOGGER.info("Trace log: %s", log_path.resolve())
     LOGGER.info("Arguments: %s", vars(args))
+    LOGGER.info("Effective log level: %s", log_level)
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -374,6 +408,7 @@ def main():
             epochs=args.epochs,
             learning_rate=args.learning_rate,
             device=device,
+            trace_every_n_batches=args.trace_every_n_batches,
         )
 
     with trace_step("predict_test_set", args.trace):
